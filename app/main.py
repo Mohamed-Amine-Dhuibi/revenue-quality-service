@@ -6,9 +6,11 @@ server (uvicorn) can import ``app.main:app``.
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .api.routes import router
+from .config import get_settings
 
 
 def create_app() -> FastAPI:
@@ -21,6 +23,15 @@ def create_app() -> FastAPI:
             "revenue quality score and a lending recommendation."
         ),
     )
+
+    # Allow the React dashboard (browser origin) to call the API.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_origins_list,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+
     app.include_router(router)
     return app
 

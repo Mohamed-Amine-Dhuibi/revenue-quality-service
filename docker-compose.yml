@@ -6,4 +6,19 @@ services:
     environment:
       # Pulled from your shell / .env file. Never hard-code the key here.
       RQS_API_KEY: ${RQS_API_KEY:?set RQS_API_KEY in your environment or .env}
+      # Allow the dashboard's browser origin to call the API.
+      RQS_CORS_ALLOW_ORIGINS: ${RQS_CORS_ALLOW_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # Where the browser reaches the API (host-published port, not the
+        # compose-internal hostname, since the request originates in the browser).
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
     restart: unless-stopped

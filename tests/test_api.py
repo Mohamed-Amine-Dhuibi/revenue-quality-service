@@ -1,11 +1,18 @@
-"""End-to-end API tests against the real sample file."""
+"""End-to-end API tests against the real sample file.
+
+We override ``get_settings`` with a fixed key so the suite is deterministic
+regardless of any local ``.env`` / ``RQS_API_KEY`` in the developer's shell.
+"""
 from fastapi.testclient import TestClient
 
+from app.config import Settings, get_settings
 from app.main import app
 
-# The default key when RQS_API_KEY is unset (see config.Settings).
-VALID_KEY = "dev-local-key-change-me"
+VALID_KEY = "test-key-do-not-use-in-prod"
 HEADERS = {"X-API-Key": VALID_KEY}
+
+# Explicit kwarg beats env/.env in pydantic-settings, so this is hermetic.
+app.dependency_overrides[get_settings] = lambda: Settings(api_key=VALID_KEY)
 
 client = TestClient(app)
 

@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     # --- Upload guardrails --------------------------------------------------
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB hard cap on the CSV
 
+    # --- CORS ---------------------------------------------------------------
+    # Comma-separated list of origins allowed to call the API from a browser.
+    # Defaults to the Vite dev server. Set RQS_CORS_ALLOW_ORIGINS in production.
+    cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:
