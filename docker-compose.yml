@@ -1,0 +1,9 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Pulled from your shell / .env file. Never hard-code the key here.
+      RQS_API_KEY: ${RQS_API_KEY:?set RQS_API_KEY in your environment or .env}
+    restart: unless-stopped

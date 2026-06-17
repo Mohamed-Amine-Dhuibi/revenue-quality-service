@@ -1,0 +1,14 @@
+[project]
+name = "revenue-quality-service"
+version = "1.0.0"
+description = "Revenue quality scoring from bank-statement transactions (POST /analyse)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
