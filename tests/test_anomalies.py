@@ -64,7 +64,8 @@ def test_related_party_flow_aggregation():
         make_inflow(20000, "A AL HARBI", "OWN ACCT TRF FROM A AL HARBI"),
         make_inflow(9518.51, "ALMARAI", "INWARD TT - ALMARAI"),
     ]
-    labels, _ = classify_inflows(inflows, learn_borrower_profile(inflows))
+    cls, _ = classify_inflows(inflows, learn_borrower_profile(inflows))
+    labels = [c.label for c in cls]
     res = suspected_related_party_flows(inflows, labels, sum(r["amount"] for r in inflows))
     assert res["detected"] is True
     assert res["count"] == 2
@@ -74,7 +75,8 @@ def test_related_party_flow_aggregation():
 def test_all_four_patterns_fire_on_sample(sample_rows):
     inflows = [r for r in sample_rows if r["is_inflow"]]
     total = sum(r["amount"] for r in inflows)
-    labels, _ = classify_inflows(inflows, learn_borrower_profile(inflows))
+    cls, _ = classify_inflows(inflows, learn_borrower_profile(inflows))
+    labels = [c.label for c in cls]
 
     assert round_number_bias(inflows, total)["detected"]
     assert identical_amount_repeats(inflows, total)["detected"]

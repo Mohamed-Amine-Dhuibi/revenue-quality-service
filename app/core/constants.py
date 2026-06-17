@@ -24,22 +24,86 @@ STOPWORDS: frozenset[str] = frozenset(
     }
 )
 
-# Explicit, unambiguous markers found in the transaction text itself.
-INTERCOMPANY_MARKERS: tuple[str, ...] = (
-    "INTERCOMPANY", "INTER COMPANY", "INTERCO", "INTRAGROUP", "INTRA GROUP",
+# Signals are organised in two confidence tiers (see classifier.py):
+#   STRONG = explicit and unambiguous -> classify directly (high confidence).
+#   WEAK   = affiliation / contextual -> only act when corroborated (shared brand
+#            token, person-name shape) or to resolve an otherwise-unclassified row.
+# Adding to a STRONG tuple is pure recall with no precision cost; WEAK signals can
+# never misfire on their own. The lexicons are sector-agnostic on purpose.
+
+# ── STRONG: intercompany / intra-group transfers ───────────────────────────
+INTERCOMPANY_STRONG: tuple[str, ...] = (
+    "INTERCOMPANY", "INTER COMPANY", "INTER-CO", "INTERCO", "INTRAGROUP",
+    "INTRA GROUP", "INTRA-GROUP", "IC TRF", "I/C TRF", "INTERBRANCH",
+    "INTER BRANCH", "INTER-BRANCH", "HEAD OFFICE", "H/O TRF", "HO TRANSFER",
+    "GROUP TRANSFER", "GRP TRF", "SHAREHOLDER LOAN", "DIRECTOR LOAN",
+    "CAPITAL INJECTION", "EQUITY INJECTION", "RELATED PARTY", "RELATED-PARTY",
+    "TRANSFER PRICING", "COST RECHARGE", "INTERCO SETTLEMENT", "DUE FROM GROUP",
 )
-RELATED_PARTY_KEYWORDS: tuple[str, ...] = (
+# ── STRONG: owner / personal funding ───────────────────────────────────────
+PERSONAL_STRONG: tuple[str, ...] = (
+    "OWN ACCT", "OWN ACCOUNT", "OWN A/C", "SELF TRF", "SELF TRANSFER",
+    "FROM SELF", "PERSONAL ACCOUNT", "PERSONAL SAVINGS", "PERSONAL TRANSFER",
+    "CAPITAL CONTRIBUTION", "PARTNER CONTRIBUTION", "SHAREHOLDER CONTRIBUTION",
+    "OWNER FUNDING", "PROPRIETOR",
+)
+# ── STRONG: genuine third-party commercial inflows (payment rails, sector-
+#    agnostic: wires, cards/POS, e-commerce, cheques, collections, invoices) ──
+COMMERCIAL_STRONG: tuple[str, ...] = (
+    # bank wires / transfers
+    "INWARD TT", "INWARD TELEGRAPHIC", "INCOMING WIRE", "INWARD REMIT",
+    "INWARD REMITTANCE", "RTGS", "SARIE", "ACH CREDIT", "GIRO", "SWIFT CREDIT",
+    # cards / POS / e-commerce settlement
+    "POS SETTLEMENT", "POS DEP", "MERCHANT SETTLEMENT", "CARD SETTLEMENT",
+    "ACQUIRER", "MADA", "SADAD", "E-COMMERCE", "ECOM ", "PAYMENT GATEWAY",
+    "PAYTABS", "MOYASAR", "HYPERPAY", "TAP PAYMENTS", "STC PAY", "URPAY",
+    "VISA SETTLEMENT", "MASTERCARD SETTLEMENT",
+    # cheques / collections / invoices / contracts
+    "INWARD CHEQUE", "INWARD CHQ", "CHEQUE DEPOSIT", "CHQ DEP", "INVOICE",
+    "INV NO", "CUSTOMER PAYMENT", "CONTRACT PAYMENT", "PROGRESS PAYMENT",
+    "MILESTONE PAYMENT", "PURCHASE ORDER", "RENTAL INCOME", "RENT RECEIVED",
+)
+
+# ── WEAK: affiliation suffixes (legal forms / group words). Never classify on
+#    their own — used only to corroborate a shared brand token or to flag a
+#    commercial row as "verify, could be related-party". ──
+RELATED_PARTY_WEAK: tuple[str, ...] = (
     "HOLDING", "HOLDINGS", "HLD", "GROUP", " GRP", "SUBSIDIARY", "AFFILIATE",
-    "PARENT", "BRANCH", " FZ", "FZE", "FZCO", "SISTER",
+    "PARENT", "SISTER", "FAMILY OFFICE", "INVESTMENT", "INVESTMENTS",
+    "VENTURES", "BRANCH",
 )
-PERSONAL_MARKERS: tuple[str, ...] = (
-    "OWN ACCT", "OWN ACCOUNT", "PERSONAL", "SELF", "PROPRIETOR", "OWNER",
+# ── WEAK: honorific titles preceding a person name (corroborate w/ name shape) ──
+PERSONAL_WEAK_TITLES: tuple[str, ...] = (
+    "MR ", "MRS ", "MS ", "MISS ", "DR ", "ENG ", "SHEIKH ", "SH ", "PROF ",
 )
-# A genuine third-party commercial inflow usually looks like an inbound wire.
-COMMERCIAL_MARKERS: tuple[str, ...] = (
-    "INWARD TT", "INWARD TELEGRAPHIC", "INCOMING WIRE", "POS ", "INVOICE",
-    "INV ", "CUSTOMER", "SALES", "INWARD CHEQUE", "INWARD CHQ",
+# ── WEAK: generic revenue words (only when nothing stronger matched) ──
+COMMERCIAL_WEAK: tuple[str, ...] = (
+    "COLLECTION", "SETTLEMENT", "PAYMENT RECEIVED", "RECEIPT", "SALES",
+    "REMITTANCE", "SUBSCRIPTION", "RETAINER", "DEPOSIT FROM",
 )
+
+# Corporate legal-form / organisation tokens. Presence => the counterparty is an
+# organisation, not a person (drives the person-name vs company detectors).
+CORPORATE_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "LLC", "LTD", "CO", "COMPANY", "INC", "CORP", "CORPORATION", "PLC",
+        "WLL", "SPC", "PJSC", "PSC", "SAL", "SARL", "GMBH", "PTE", "SDN", "BHD",
+        "EST", "ESTABLISHMENT", "TRADING", "ENTERPRISE", "ENTERPRISES",
+        "INDUSTRIES", "INDUSTRIAL", "FACTORY", "GROUP", "HOLDING", "HOLDINGS",
+        "HLD", "GRP", "FZE", "FZCO", "FZ", "DMCC", "JLT", "SERVICES",
+        "SOLUTIONS", "TECHNOLOGIES", "CONTRACTING", "CONSULTING", "CONSULTANCY",
+        "AGENCY", "STORES", "MARKET", "FOODS", "LOGISTICS", "PARTNERS",
+    }
+)
+# Person-name particles (incl. common Arabic) that mark a string as a human name.
+PERSON_NAME_PARTICLES: frozenset[str] = frozenset(
+    {"AL", "BIN", "BINT", "ABU", "ABD", "ABDUL", "ABDULLAH", "BANI", "UMM", "IBN"}
+)
+# NOTE: we deliberately do NOT keep a "known big corporate" allow-list. A
+# counterparty name in a bank narration is unverified free text, so auto-trusting
+# big-brand names would (a) overfit to whatever names appear in a given sample and
+# (b) reward the cheapest fabrication technique — naming fake inflows after real
+# companies. Legitimacy must come from the transaction's own markers, not its name.
 
 # ---------------------------------------------------------------------------
 # Anomaly detection thresholds

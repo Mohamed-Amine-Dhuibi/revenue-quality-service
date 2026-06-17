@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from ..core.normalize import learn_borrower_profile
 from .anomalies import _txn_view, detect_all
-from .classifier import classify_inflows
+from .classifier import classify_inflows, confidence_summary
 from .scoring import compute_score, recommend
 
 
@@ -65,7 +65,8 @@ def run_analysis(
 
     # --- Detection stages --------------------------------------------------
     profile = learn_borrower_profile(inflows, borrower_name=borrower_name)
-    labels, breakdown = classify_inflows(inflows, profile)
+    classifications, breakdown = classify_inflows(inflows, profile)
+    labels = [c.label for c in classifications]
     anomalies = detect_all(inflows, labels, total_inflow)
     scoring = compute_score(breakdown, anomalies)
     recommendation = recommend(scoring["score"], breakdown)
@@ -84,6 +85,12 @@ def run_analysis(
                            "personal_to_business_likely")
             ][:5],
         },
+        "review_queue": [
+            {**_txn_view(r), "category": cls.label,
+             "confidence": cls.confidence, "reason": cls.reason}
+            for r, cls in zip(inflows, classifications)
+            if cls.confidence != "high"
+        ][:15],
         "notes": [
             "Inflows are identified by a positive amount (credit). Outflows are ignored "
             "for revenue-quality purposes.",
@@ -107,6 +114,7 @@ def run_analysis(
             "total_outflow": round(total_outflow, 2),
             "annualised_inflow_estimate": round(total_inflow / months * 12, 2),
             "borrower_profile": profile.as_dict(),
+            "classification_confidence": confidence_summary(inflows, classifications),
         },
         "inflow_breakdown": breakdown,
         "pattern_anomalies": anomalies,
