@@ -9,7 +9,7 @@ import pytest
 
 from app.detection.parser import parse_csv
 
-SAMPLE_CSV = Path(__file__).resolve().parent.parent / "data" / "sample_hawk_tech.csv"
+SAMPLE_CSV = Path(__file__).resolve().parent / "fixtures" / "sample_hawk_tech.csv"
 
 
 @pytest.fixture(scope="session")
