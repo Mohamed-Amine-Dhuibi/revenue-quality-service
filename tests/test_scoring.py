@@ -14,7 +14,8 @@ from .conftest import make_inflow
 def _score_for(inflows):
     total = sum(r["amount"] for r in inflows)
     profile = learn_borrower_profile(inflows)
-    labels, breakdown = classify_inflows(inflows, profile)
+    classifications, breakdown = classify_inflows(inflows, profile)
+    labels = [c.label for c in classifications]
     anomalies = detect_all(inflows, labels, total)
     result = compute_score(breakdown, anomalies)
     return result, breakdown

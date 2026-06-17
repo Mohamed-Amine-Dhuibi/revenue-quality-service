@@ -11,7 +11,13 @@ from __future__ import annotations
 
 import re
 
-from .constants import INTERCOMPANY_MARKERS, PERSONAL_MARKERS, STOPWORDS
+from .constants import (
+    CORPORATE_SUFFIXES,
+    INTERCOMPANY_STRONG,
+    PERSON_NAME_PARTICLES,
+    PERSONAL_STRONG,
+    STOPWORDS,
+)
 
 _TOKEN_RE = re.compile(r"[^A-Z0-9]+")
 
@@ -25,9 +31,31 @@ def tokens(text: str | None) -> list[str]:
     return [t for t in _TOKEN_RE.split(upper(text)) if len(t) >= 3 and t not in STOPWORDS]
 
 
+def raw_tokens(text: str | None) -> list[str]:
+    """All tokens, no stopword removal — for name/company shape detection."""
+    return [t for t in _TOKEN_RE.split(upper(text)) if t]
+
+
 def contains_any(haystack: str, needles) -> bool:
     up = upper(haystack)
     return any(n.upper() in up for n in needles)
+
+
+def looks_like_company(name: str | None) -> bool:
+    """A counterparty carrying a corporate legal-form / organisation token."""
+    return any(t in CORPORATE_SUFFIXES for t in raw_tokens(name))
+
+
+def looks_like_person_name(name: str | None) -> bool:
+    """Heuristic: 2–4 alphabetic tokens, no corporate suffix, and at least one
+    personal-name particle (e.g. AL / BIN / ABDUL). Requiring a particle keeps
+    this precise — it won't misread two-word company names like "Omega Net"."""
+    toks = [t for t in raw_tokens(name) if t.isalpha()]
+    if not 2 <= len(toks) <= 4:
+        return False
+    if any(t in CORPORATE_SUFFIXES for t in toks):
+        return False
+    return any(t in PERSON_NAME_PARTICLES for t in toks)
 
 
 class BorrowerProfile:
@@ -65,9 +93,9 @@ def learn_borrower_profile(
     for row in inflows:
         text = f"{row['description']} {row['counterparty_raw']}"
         cp_tokens = tokens(row["counterparty_raw"])
-        if contains_any(text, INTERCOMPANY_MARKERS):
+        if contains_any(text, INTERCOMPANY_STRONG):
             related.update(cp_tokens)
-        if contains_any(text, PERSONAL_MARKERS):
+        if contains_any(text, PERSONAL_STRONG):
             owner.update(cp_tokens)
 
     # Owner tokens that are also brand tokens (shouldn't happen, but be safe)
